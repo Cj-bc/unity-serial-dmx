@@ -1,0 +1,64 @@
+name: Rename Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      package-name:
+        description: "New package name (e.g. com.example.my-package)"
+        required: true
+        type: string
+
+jobs:
+  rename-package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check repository owner
+        if: github.actor != github.repository_owner
+        run: |
+          echo "::error::Only the repository owner can run this action."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - name: Validate input
+        env:
+          PACKAGE_NAME: ${{ inputs.package-name }}
+        run: |
+          if [ -z "$PACKAGE_NAME" ]; then
+            echo "::error::package-name must not be empty"
+            exit 1
+          fi
+          if ! echo "$PACKAGE_NAME" | grep -qE '^[a-z][a-z0-9._-]*$'; then
+            echo "::error::package-name contains invalid characters. Only lowercase letters, digits, dots, hyphens, and underscores are allowed (must start with a letter)."
+            exit 1
+          fi
+          if echo "$PACKAGE_NAME" | grep -qE '\.\.'; then
+            echo "::error::package-name must not contain '..'"
+            exit 1
+          fi
+
+      - name: Replace package name in package.json
+        env:
+          PACKAGE_NAME: ${{ inputs.package-name }}
+        run: |
+          jq --arg name "$PACKAGE_NAME" '.name = $name | .displayName = $name' \
+            Packages/package-name/package.json > tmp.json
+          mv tmp.json Packages/package-name/package.json
+
+      - name: Rename package directory
+        env:
+          PACKAGE_NAME: ${{ inputs.package-name }}
+        run: |
+          mv "Packages/package-name" "Packages/$PACKAGE_NAME"
+
+      - name: Commit and push changes
+        env:
+          PACKAGE_NAME: ${{ inputs.package-name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Rename package to $PACKAGE_NAME"
+          git push
