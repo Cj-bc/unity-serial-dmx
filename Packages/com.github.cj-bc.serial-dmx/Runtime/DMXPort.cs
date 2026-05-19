@@ -5,11 +5,13 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 
 /// シリアル to DMX変換ケーブルを用いたDMXPortを扱うためのクラス。
-public class DMXPort
+public class DMXPort : IDisposable
 {
     private SerialPort _port;
     private byte[] _buf;
     private int _nextFreeChannel = 1;
+
+    private bool _disposed = false;
 
     public DMXPort(string portName, int baudRate, int initialMaxChannels)
     {
@@ -67,7 +69,26 @@ public class DMXPort
         {
             _port.Close();
             _port.Dispose();
+            _port = null;
         }
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    public void Dispose(bool disposing)
+    {
+        if (_disposed) return;
+
+        if (disposing)
+        {
+            _port?.Dispose();
+        }
+
+        _disposed = true;
     }
 }
 
