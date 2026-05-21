@@ -5,17 +5,16 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 
 /// シリアル to DMX変換ケーブルを用いたDMXPortを扱うためのクラス。
-public class DMXPort : IDisposable
+public class DMXPort
 {
-    private SerialPort _port;
     private byte[] _buf;
     private int _nextFreeChannel = 1;
-
-    private bool _disposed = false;
+    private string _portName;
+    private int _baudRate;
 
     public DMXPort(string portName, int baudRate, int initialMaxChannels)
     {
-        _port = new SerialPort(portName, baudRate, Parity.None, 8, StopBits.Two);
+        _portName = portName;
         _buf = new byte[initialMaxChannels];
     }
 
@@ -52,43 +51,19 @@ public class DMXPort : IDisposable
     /// シリアル通信を開始する。
     public async UniTask Begin(CancellationToken cancellationToken)
     {
-        try
-        {
-            _port.Open();
+        using var port = new SerialPort(_portName, _baudRate, Parity.None, 8, StopBits.Two);
+        port.Open();
 
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                _port.BreakState = true;
-                await UniTask.Delay(TimeSpan.FromMilliseconds(1), cancellationToken: cancellationToken);
-                _port.BreakState = false;
-                await UniTask.Delay(TimeSpan.FromMilliseconds(1), cancellationToken: cancellationToken);
-                _port.Write(_buf, 0, _buf.Length);
-                await UniTask.NextFrame();
-            }
-        } finally
+        while (!cancellationToken.IsCancellationRequested)
         {
-            _port.Close();
-            _port.Dispose();
-            _port = null;
+            port.BreakState = true;
+            await UniTask.Delay(TimeSpan.FromMilliseconds(1), cancellationToken: cancellationToken);
+            port.BreakState = false;
+            await UniTask.Delay(TimeSpan.FromMilliseconds(1), cancellationToken: cancellationToken);
+            port.Write(_buf, 0, _buf.Length);
+            await UniTask.NextFrame();
         }
-    }
-
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
-
-    public void Dispose(bool disposing)
-    {
-        if (_disposed) return;
-
-        if (disposing)
-        {
-            _port?.Dispose();
-        }
-
-        _disposed = true;
+        port.Close();
     }
 }
 
