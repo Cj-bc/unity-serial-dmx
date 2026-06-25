@@ -16,6 +16,7 @@ public class DMXPort
     {
         _portName = portName;
         _buf = new byte[initialMaxChannels];
+        _baudRate = baudRate;
     }
 
     // 動的にチャンネルの切り分け等をしたい可能性があるかなと思ったた
